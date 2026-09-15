@@ -1,0 +1,162 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:uzbek_news/features/news/data/news_api.dart';
+import 'package:uzbek_news/features/news/models/news_article.dart';
+import 'package:uzbek_news/features/news/presentation/news_detail_screen.dart';
+import 'package:uzbek_news/features/news/presentation/news_feed_screen.dart';
+
+NewsArticle sample({String summary = 'First paragraph.\n\nLast paragraph.'}) =>
+    NewsArticle(
+      id: 7,
+      title: 'Article title',
+      summary: summary,
+      source: 'future_publisher',
+      sourceUrl: Uri.parse('https://example.org/story?a=1&b=two#section'),
+      publishedAt: DateTime.utc(2026, 9, 15, 9, 33),
+    );
+
+void main() {
+  testWidgets(
+    'whole card opens detail and back preserves feed without fetching',
+    (tester) async {
+      var requests = 0;
+      final article = sample();
+      final api = NewsApi(
+        client: MockClient((_) async {
+          requests++;
+          return http.Response(
+            jsonEncode({
+              'items': [
+                {
+                  'id': article.id,
+                  'title': article.title,
+                  'summary': article.summary,
+                  'source': article.source,
+                  'source_url': article.sourceUrl.toString(),
+                  'published_at': article.publishedAt.toIso8601String(),
+                },
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+      addTearDown(api.close);
+      await tester.pumpWidget(MaterialApp(home: NewsFeedScreen(api: api)));
+      await tester.pumpAndSettle();
+      final metadata = tester
+          .widget<Text>(find.textContaining('future_publisher'))
+          .data;
+      // Tap the card's padding, outside its text.
+      await tester.tapAt(
+        tester.getTopLeft(find.byType(Card)) + const Offset(8, 8),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(NewsDetailScreen), findsOneWidget);
+      expect(find.text(article.title), findsOneWidget);
+      expect(find.text(article.summary), findsOneWidget);
+      expect(find.text(metadata!), findsOneWidget);
+      expect(find.text('Read original'), findsOneWidget);
+      expect(requests, 1);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(NewsDetailScreen), findsNothing);
+      expect(find.byType(Card), findsOneWidget);
+      expect(requests, 1);
+    },
+  );
+
+  testWidgets('complete multiline summary scrolls to original action', (
+    tester,
+  ) async {
+    final article = sample(
+      summary: List.filled(50, 'A complete paragraph.').join('\n\n'),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: NewsDetailScreen(article: article)),
+    );
+    expect(find.text(article.title), findsOneWidget);
+    final summary = tester.widget<Text>(find.text(article.summary));
+    expect(summary.data, article.summary);
+    expect(summary.maxLines, isNull);
+    expect(find.text('Read original').hitTestable(), findsNothing);
+    await tester.scrollUntilVisible(find.text('Read original'), 500);
+    expect(find.text('Read original').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('original action passes unchanged URI and external mode', (
+    tester,
+  ) async {
+    final article = sample();
+    Uri? opened;
+    LaunchMode? requestedMode;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NewsDetailScreen(
+          article: article,
+          openUrl: (url, {mode = LaunchMode.platformDefault}) async {
+            opened = url;
+            requestedMode = mode;
+            return true;
+          },
+        ),
+      ),
+    );
+    await tester.tap(find.text('Read original'));
+    await tester.pumpAndSettle();
+    expect(opened, same(article.sourceUrl));
+    expect(requestedMode, LaunchMode.externalApplication);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  for (final throws in [false, true]) {
+    testWidgets(
+      'launch ${throws ? 'exception' : 'false result'} shows friendly failure',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: NewsDetailScreen(
+              article: sample(),
+              openUrl: (_, {mode = LaunchMode.platformDefault}) async {
+                if (throws) throw Exception('internal platform details');
+                return false;
+              },
+            ),
+          ),
+        );
+        await tester.tap(find.text('Read original'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Unable to open the original article.'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('internal platform details'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('launch failure after leaving detail is safe', (tester) async {
+    final pending = Completer<bool>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NewsDetailScreen(
+          article: sample(),
+          openUrl: (_, {mode = LaunchMode.platformDefault}) => pending.future,
+        ),
+      ),
+    );
+    await tester.tap(find.text('Read original'));
+    await tester.pumpWidget(const SizedBox());
+    pending.complete(false);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+}

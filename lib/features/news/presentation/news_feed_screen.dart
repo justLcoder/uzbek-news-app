@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../data/news_api.dart';
 import '../models/news_article.dart';
+import 'article_date_time.dart';
+import 'news_detail_screen.dart';
 
 class NewsFeedScreen extends StatefulWidget {
   const NewsFeedScreen({super.key, this.api});
@@ -101,37 +103,38 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                       itemBuilder: (context, index) {
                         final article = _articles[index];
                         final theme = Theme.of(context);
-                        final localDate = article.publishedAt.toLocal();
-                        final locale = MaterialLocalizations.of(context);
-                        final date = locale.formatMediumDate(localDate);
-                        final time = locale.formatTimeOfDay(
-                          TimeOfDay.fromDateTime(localDate),
-                          alwaysUse24HourFormat:
-                              MediaQuery.alwaysUse24HourFormatOf(context),
-                        );
                         return Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  article.title,
-                                  style: theme.textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  article.summary,
-                                  style: theme.textTheme.bodyLarge,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  '${article.source} / $date / $time',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    NewsDetailScreen(article: article),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    article.title,
+                                    style: theme.textTheme.titleLarge,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    article.summary,
+                                    style: theme.textTheme.bodyLarge,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    '${article.source} / ${formatArticleDateTime(context, article.publishedAt)}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         );
