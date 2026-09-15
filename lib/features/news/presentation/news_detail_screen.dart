@@ -45,12 +45,14 @@ class NewsDetailScreen extends StatelessWidget {
               Text(article.title, style: theme.textTheme.headlineSmall),
               const SizedBox(height: 12),
               Text(
-                '${article.source} / ${formatArticleDateTime(context, article.publishedAt)}',
+                'Publisher: ${article.source} / ${formatArticleDateTime(context, article.publishedAt)}',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 24),
+              const Chip(label: Text('AI-generated summary')),
+              const SizedBox(height: 8),
               Text(article.summary, style: theme.textTheme.bodyLarge),
               const SizedBox(height: 24),
               FilledButton.icon(

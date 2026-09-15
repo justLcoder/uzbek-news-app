@@ -61,7 +61,12 @@ void main() {
       expect(find.byType(NewsDetailScreen), findsOneWidget);
       expect(find.text(article.title), findsOneWidget);
       expect(find.text(article.summary), findsOneWidget);
-      expect(find.text(metadata!), findsOneWidget);
+      expect(find.text('Publisher: $metadata').hitTestable(), findsOneWidget);
+      expect(find.text('AI-generated summary').hitTestable(), findsOneWidget);
+      expect(
+        tester.getBottomLeft(find.text('AI-generated summary')).dy,
+        lessThan(tester.getTopLeft(find.text(article.summary)).dy),
+      );
       expect(find.text('Read original'), findsOneWidget);
       expect(requests, 1);
       await tester.pageBack();
@@ -82,6 +87,11 @@ void main() {
       MaterialApp(home: NewsDetailScreen(article: article)),
     );
     expect(find.text(article.title), findsOneWidget);
+    expect(
+      find.textContaining('Publisher: future_publisher').hitTestable(),
+      findsOneWidget,
+    );
+    expect(find.text('AI-generated summary').hitTestable(), findsOneWidget);
     final summary = tester.widget<Text>(find.text(article.summary));
     expect(summary.data, article.summary);
     expect(summary.maxLines, isNull);
