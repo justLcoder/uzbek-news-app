@@ -22,6 +22,65 @@ NewsArticle sample({String summary = 'First paragraph.\n\nLast paragraph.'}) =>
     );
 
 void main() {
+  for (final source in ['kun_uz', 'future_publisher']) {
+    testWidgets('compact preview opens full summary for $source', (
+      tester,
+    ) async {
+      final summary = List.filled(
+        12,
+        'A full paragraph of news that must be preserved.',
+      ).join('\n\n');
+      final api = NewsApi(
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'items': [
+                {
+                  'id': 1,
+                  'title': 'The complete article title',
+                  'summary': summary,
+                  'source': source,
+                  'source_url': 'https://example.org/news',
+                  'published_at': '2026-09-15T09:33:00Z',
+                },
+              ],
+            }),
+            200,
+          ),
+        ),
+      );
+      addTearDown(api.close);
+      await tester.pumpWidget(MaterialApp(home: NewsFeedScreen(api: api)));
+      await tester.pumpAndSettle();
+      final preview = tester.widget<Text>(find.text(summary));
+      expect(preview.maxLines, 3);
+      expect(preview.overflow, TextOverflow.ellipsis);
+      expect(preview.data, summary);
+      expect(
+        tester.widget<Text>(find.text('The complete article title')).maxLines,
+        isNull,
+      );
+      expect(find.text('AI summary').hitTestable(), findsOneWidget);
+      final displayName = source == 'kun_uz' ? 'Kun.uz' : source;
+      expect(
+        find.textContaining('$displayName /').hitTestable(),
+        findsOneWidget,
+      );
+      await tester.tapAt(
+        tester.getTopLeft(find.byType(Card)) + const Offset(8, 8),
+      );
+      await tester.pumpAndSettle();
+      final detail = tester.widget<NewsDetailScreen>(
+        find.byType(NewsDetailScreen),
+      );
+      expect(detail.article.summary, summary);
+      expect(detail.article.source, source);
+      expect(tester.widget<Text>(find.text(summary)).maxLines, isNull);
+      expect(find.textContaining('Publisher: $displayName /'), findsOneWidget);
+      expect(find.text('AI-generated summary'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets(
     'whole card opens detail and back preserves feed without fetching',
     (tester) async {

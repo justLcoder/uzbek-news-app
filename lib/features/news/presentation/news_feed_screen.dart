@@ -4,6 +4,7 @@ import '../data/news_api.dart';
 import '../models/news_article.dart';
 import 'article_date_time.dart';
 import 'news_detail_screen.dart';
+import 'source_display_name.dart';
 
 class NewsFeedScreen extends StatefulWidget {
   const NewsFeedScreen({super.key, this.api});
@@ -123,12 +124,21 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
+                                    'AI summary',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
                                     article.summary,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
                                     style: theme.textTheme.bodyLarge,
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    '${article.source} / ${formatArticleDateTime(context, article.publishedAt)}',
+                                    '${sourceDisplayName(article.source)} / ${formatArticleDateTime(context, article.publishedAt)}',
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       color: theme.colorScheme.onSurfaceVariant,
                                     ),

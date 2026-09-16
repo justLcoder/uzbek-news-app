@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/news_article.dart';
 import 'article_date_time.dart';
+import 'source_display_name.dart';
 
 class NewsDetailScreen extends StatelessWidget {
   const NewsDetailScreen({
@@ -45,7 +46,7 @@ class NewsDetailScreen extends StatelessWidget {
               Text(article.title, style: theme.textTheme.headlineSmall),
               const SizedBox(height: 12),
               Text(
-                'Publisher: ${article.source} / ${formatArticleDateTime(context, article.publishedAt)}',
+                'Publisher: ${sourceDisplayName(article.source)} / ${formatArticleDateTime(context, article.publishedAt)}',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
