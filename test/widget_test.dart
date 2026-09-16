@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -57,8 +58,10 @@ void main() {
     });
   }
   test('API requests production endpoint and decodes UTF-8', () async {
+    var attempts = 0;
     final api = NewsApi(
       client: MockClient((request) async {
+        attempts++;
         expect(
           request.url.toString(),
           'https://kun-news-summarizer.onrender.com/api/v1/news',
@@ -76,6 +79,7 @@ void main() {
     );
     addTearDown(api.close);
     expect((await api.fetchNews()).single.title, 'O‘zbekiston');
+    expect(attempts, 1);
   });
   for (final body in [
     'invalid',
@@ -86,35 +90,101 @@ void main() {
     '{"items":[{}]}',
   ]) {
     test('API rejects malformed response $body', () async {
+      var attempts = 0;
       final api = NewsApi(
-        client: MockClient((_) async => http.Response(body, 200)),
+        client: MockClient((_) async {
+          attempts++;
+          return http.Response(body, 200);
+        }),
       );
       addTearDown(api.close);
       await expectLater(api.fetchNews(), throwsA(isA<NewsApiException>()));
+      expect(attempts, 1);
     });
   }
-  test('API rejects non-200', () async {
+  for (final statusCode in [404, 503]) {
+    test('API rejects HTTP $statusCode without retrying', () async {
+      var attempts = 0;
+      final api = NewsApi(
+        client: MockClient((_) async {
+          attempts++;
+          return http.Response('{}', statusCode);
+        }),
+      );
+      addTearDown(api.close);
+      await expectLater(api.fetchNews(), throwsA(isA<NewsApiException>()));
+      expect(attempts, 1);
+    });
+  }
+  test('API surfaces non-socket client failures without retrying', () async {
+    var attempts = 0;
     final api = NewsApi(
-      client: MockClient((_) async => http.Response('{}', 503)),
-    );
-    addTearDown(api.close);
-    await expectLater(api.fetchNews(), throwsA(isA<NewsApiException>()));
-  });
-  test('API surfaces network failures', () async {
-    final api = NewsApi(
-      client: MockClient((_) async => throw http.ClientException('offline')),
+      client: MockClient((_) async {
+        attempts++;
+        throw http.ClientException('offline');
+      }),
     );
     addTearDown(api.close);
     await expectLater(api.fetchNews(), throwsA(isA<http.ClientException>()));
+    expect(attempts, 1);
   });
-  test('API times out', () async {
+  test('API retries one timeout and then succeeds', () async {
+    var attempts = 0;
     final api = NewsApi(
       timeout: const Duration(milliseconds: 1),
-      client: MockClient((_) => Completer<http.Response>().future),
+      client: MockClient((_) {
+        attempts++;
+        return attempts == 1
+            ? Completer<http.Response>().future
+            : Future.value(feed());
+      }),
     );
     addTearDown(api.close);
-    await expectLater(api.fetchNews(), throwsA(isA<TimeoutException>()));
+    expect((await api.fetchNews()).single.title, 'News title');
+    expect(attempts, 2);
   });
+  test('API retries one socket failure and then succeeds', () async {
+    var attempts = 0;
+    final api = NewsApi(
+      client: MockClient((_) async {
+        attempts++;
+        if (attempts == 1) throw const SocketException('offline');
+        return feed();
+      }),
+    );
+    addTearDown(api.close);
+    expect((await api.fetchNews()).single.title, 'News title');
+    expect(attempts, 2);
+  });
+  test('API stops after two transient failures', () async {
+    var attempts = 0;
+    final api = NewsApi(
+      client: MockClient((_) async {
+        attempts++;
+        throw const SocketException('offline');
+      }),
+    );
+    addTearDown(api.close);
+    await expectLater(api.fetchNews(), throwsA(isA<SocketException>()));
+    expect(attempts, 2);
+  });
+  for (final error in [
+    const HandshakeException('bad certificate'),
+    StateError('programming error'),
+  ]) {
+    test('API does not retry ${error.runtimeType}', () async {
+      var attempts = 0;
+      final api = NewsApi(
+        client: MockClient((_) async {
+          attempts++;
+          throw error;
+        }),
+      );
+      addTearDown(api.close);
+      await expectLater(api.fetchNews(), throwsA(same(error)));
+      expect(attempts, 1);
+    });
+  }
   testWidgets(
     'loading then real layout, refresh replaces feed with empty state',
     (tester) async {

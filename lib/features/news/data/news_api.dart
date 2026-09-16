@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -13,9 +15,7 @@ class NewsApi {
     'https://kun-news-summarizer.onrender.com/api/v1/news',
   );
   Future<List<NewsArticle>> fetchNews() async {
-    final response = await _client
-        .get(_endpoint, headers: {'Accept': 'application/json'})
-        .timeout(timeout);
+    final response = await _fetchResponse();
     if (response.statusCode != 200) {
       throw NewsApiException(
         'News request returned HTTP ${response.statusCode}.',
@@ -37,6 +37,19 @@ class NewsApi {
       throw NewsApiException('Invalid news response: ${error.message}');
     }
   }
+
+  Future<http.Response> _fetchResponse() async {
+    try {
+      return await _fetchOnce();
+    } catch (error) {
+      if (error is! TimeoutException && error is! SocketException) rethrow;
+    }
+    return _fetchOnce();
+  }
+
+  Future<http.Response> _fetchOnce() => _client
+      .get(_endpoint, headers: {'Accept': 'application/json'})
+      .timeout(timeout);
 
   NewsArticle _parseArticle(dynamic item, int index) {
     if (item is! Map<String, dynamic>) {
