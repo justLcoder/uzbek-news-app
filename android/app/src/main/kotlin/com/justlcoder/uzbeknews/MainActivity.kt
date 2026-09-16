@@ -1,4 +1,4 @@
-package com.example.uzbek_news
+package com.justlcoder.uzbeknews
 
 import io.flutter.embedding.android.FlutterActivity
 
